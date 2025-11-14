@@ -1,0 +1,378 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
+enum EnrollmentStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum DeleLevel {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+}
+
+enum FileType {
+  IMAGE
+  PDF
+  AUDIO
+  VIDEO
+  DOCUMENT
+}
+
+enum LessonProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  password      String
+  image         String?
+  role          Role      @default(STUDENT)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  
+  studentProfile   StudentProfile?
+  enrollments      Enrollment[]
+  payments         Payment[]
+  chatSessions     ChatSessionPersonal[]
+  lessonProgress   LessonProgress[]
+
+  @@index([email])
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model StudentProfile {
+  id                String     @id @default(cuid())
+  userId            String     @unique
+  
+  currentLevel      DeleLevel?
+  targetLevel       DeleLevel?
+  examDate          DateTime?
+  
+  learningGoals     String?    @db.Text
+  weakAreas         String[]
+  strengths         String[]
+  
+  studyHoursPerWeek Int?
+  preferredStudyTime String?
+  
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("student_profiles")
+}
+
+model Course {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  description String?  @db.Text
+  level       DeleLevel
+  
+  price       Float    @default(0)
+  stripePriceId String?
+  
+  published   Boolean  @default(false)
+  featured    Boolean  @default(false)
+  
+  imageUrl    String?
+  
+  duration    Int?
+  whatYouLearn String[]
+  requirements String[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lessons     Lesson[]
+  enrollments Enrollment[]
+  files       CourseFile[]
+  
+  @@index([slug])
+  @@index([level])
+  @@index([published])
+  @@map("courses")
+}
+
+model Lesson {
+  id          String   @id @default(cuid())
+  courseId    String
+  
+  title       String
+  slug        String
+  description String?  @db.Text
+  content     String   @db.Text
+  
+  order       Int
+  duration    Int?
+  
+  published   Boolean  @default(false)
+  isFree      Boolean  @default(false)
+  
+  videoUrl    String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  files       LessonFile[]
+  progress    LessonProgress[]
+  
+  @@unique([courseId, slug])
+  @@index([courseId])
+  @@index([published])
+  @@map("lessons")
+}
+
+model CourseFile {
+  id          String   @id @default(cuid())
+  courseId    String
+  
+  name        String
+  url         String
+  type        FileType
+  size        Int
+  
+  uploadedAt  DateTime @default(now())
+
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  
+  @@index([courseId])
+  @@map("course_files")
+}
+
+model LessonFile {
+  id          String   @id @default(cuid())
+  lessonId    String
+  
+  name        String
+  description String?
+  url         String
+  type        FileType
+  size        Int
+  
+  order       Int      @default(0)
+  
+  uploadedAt  DateTime @default(now())
+
+  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  
+  @@index([lessonId])
+  @@map("lesson_files")
+}
+
+model LessonProgress {
+  id          String   @id @default(cuid())
+  userId      String
+  lessonId    String
+  
+  status      LessonProgressStatus @default(NOT_STARTED)
+  progress    Int      @default(0)
+  
+  startedAt   DateTime?
+  completedAt DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, lessonId])
+  @@index([userId])
+  @@index([lessonId])
+  @@map("lesson_progress")
+}
+
+model Enrollment {
+  id          String           @id @default(cuid())
+  userId      String
+  courseId    String
+  
+  status      EnrollmentStatus @default(PENDING)
+  progress    Int              @default(0)
+  
+  startedAt   DateTime         @default(now())
+  completedAt DateTime?
+  expiresAt   DateTime?
+  
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course      Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
+  @@index([status])
+  @@map("enrollments")
+}
+
+model Payment {
+  id                  String        @id @default(cuid())
+  userId              String
+  
+  amount              Float
+  currency            String        @default("eur")
+  status              PaymentStatus @default(PENDING)
+  
+  stripeSessionId     String?       @unique
+  stripePaymentIntent String?
+  stripeCustomerId    String?
+  
+  courseId            String?
+  description         String?
+  metadata            Json?
+  
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([stripeSessionId])
+  @@index([status])
+  @@map("payments")
+}
+
+model ChatSessionPersonal {
+  id          String   @id @default(cuid())
+  userId      String
+  
+  title       String   @default("Nueva conversación")
+  summary     String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages    ChatMessage[]
+  
+  @@index([userId])
+  @@index([createdAt])
+  @@map("chat_sessions_personal")
+}
+
+model ChatMessage {
+  id          String   @id @default(cuid())
+  sessionId   String
+  
+  role        String
+  content     String   @db.Text
+  
+  model       String?
+  tokens      Int?
+  
+  createdAt   DateTime @default(now())
+
+  session     ChatSessionPersonal @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  @@index([sessionId])
+  @@index([createdAt])
+  @@map("chat_messages")
+}
+
+model BlogPost {
+  id          String   @id @default(cuid())
+  
+  title       String
+  slug        String   @unique
+  excerpt     String?
+  content     String   @db.Text
+  
+  imageUrl    String?
+  
+  published   Boolean  @default(false)
+  featured    Boolean  @default(false)
+  
+  metaTitle       String?
+  metaDescription String?
+  
+  tags        String[]
+  level       DeleLevel?
+  
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([slug])
+  @@index([published])
+  @@map("blog_posts")
+}
