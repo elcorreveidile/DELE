@@ -1,3 +1,5 @@
+import type { LucideIcon } from "lucide-react"
+import Link from "next/link"
 import { requireServerAuth } from "@/lib/auth-helpers"
 import { prisma } from "@/lib/prisma"
 import { BookOpen, GraduationCap, Clock, Trophy } from "lucide-react"
@@ -70,15 +72,29 @@ export default async function DashboardPage() {
 
       {/* Cursos activos */}
       <div>
-        <h3 className="text-xl font-semibold text-gray-900 mb-4">
-          Tus cursos activos
-        </h3>
+        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <h3 className="text-xl font-semibold text-gray-900">
+            Tus cursos activos
+          </h3>
+          <Link
+            href="/dashboard/courses"
+            className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+          >
+            Ver todos
+          </Link>
+        </div>
 
         {enrollments.length === 0 ? (
           <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
             <p className="text-gray-600">
               Aún no estás matriculado en ningún curso
             </p>
+            <Link
+              href="/dashboard/courses"
+              className="mt-4 inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+            >
+              Ver cursos disponibles
+            </Link>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -110,9 +126,12 @@ export default async function DashboardPage() {
                   </div>
                 </div>
 
-                <button className="mt-4 w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                  Continuar
-                </button>
+                <Link
+                  href={`/dashboard/courses/${enrollment.course.id}`}
+                  className="mt-4 inline-flex w-full justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Ver contenido
+                </Link>
               </div>
             ))}
           </div>
@@ -122,13 +141,13 @@ export default async function DashboardPage() {
   )
 }
 
-function StatCard({ 
-  icon: Icon, 
-  label, 
-  value, 
-  color 
-}: { 
-  icon: any
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  color,
+}: {
+  icon: LucideIcon
   label: string
   value: string | number
   color: "blue" | "purple" | "green" | "yellow"

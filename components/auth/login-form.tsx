@@ -3,110 +3,102 @@
 import { useState } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { z } from "zod"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import toast from "react-hot-toast"
-
-const loginSchema = z.object({
-  email: z.string().email("Email inválido"),
-  password: z.string().min(1, "La contraseña es requerida"),
-})
-
-type LoginFormData = z.infer<typeof loginSchema>
+import Link from "next/link"
 
 export function LoginForm() {
   const router = useRouter()
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
-  })
-
-  const onSubmit = async (data: LoginFormData) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
     setIsLoading(true)
 
     try {
       const result = await signIn("credentials", {
-        email: data.email,
-        password: data.password,
+        email,
+        password,
         redirect: false,
       })
 
       if (result?.error) {
-        toast.error(result.error)
+        setError("Credenciales incorrectas")
+        setIsLoading(false)
         return
       }
 
-      if (result?.ok) {
-        toast.success("¡Bienvenido!")
-        router.push("/dashboard")
-        router.refresh()
-      }
-    } catch (error) {
-      console.error("Error en login:", error)
-      toast.error("Error al iniciar sesión")
-    } finally {
+      router.push("/dashboard")
+      router.refresh()
+    } catch {
+      setError("Ocurrió un error. Intenta de nuevo.")
       setIsLoading(false)
     }
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      {/* Email */}
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+
       <div>
-        <label 
-          htmlFor="email" 
-          className="block text-sm font-medium text-gray-700"
-        >
+        <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
           Email
         </label>
         <input
-          {...register("email")}
-          type="email"
           id="email"
-          autoComplete="email"
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           placeholder="tu@email.com"
         />
-        {errors.email && (
-          <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
-        )}
       </div>
 
-      {/* Password */}
       <div>
-        <label 
-          htmlFor="password" 
-          className="block text-sm font-medium text-gray-700"
-        >
+        <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
           Contraseña
         </label>
         <input
-          {...register("password")}
-          type="password"
           id="password"
-          autoComplete="current-password"
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           placeholder="••••••••"
         />
-        {errors.password && (
-          <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
-        )}
       </div>
 
-      {/* Botón de submit */}
       <button
         type="submit"
         disabled={isLoading}
-        className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
       >
         {isLoading ? "Iniciando sesión..." : "Iniciar sesión"}
       </button>
+
+      <div className="text-center text-sm text-gray-600">
+        ¿No tienes cuenta?{" "}
+        <Link href="/register" className="text-blue-600 hover:underline font-medium">
+          Regístrate aquí
+        </Link>
+      </div>
+
+      <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
+        <p className="text-xs text-blue-900 mb-2 font-semibold">Usuarios de prueba:</p>
+        <div className="space-y-1 text-xs text-blue-700">
+          <p>👨‍💼 Admin: admin@dele.com / admin123</p>
+          <p>👨‍🏫 Profesor: profesor@dele.com / teacher123</p>
+          <p>👨‍🎓 Estudiante: estudiante@dele.com / student123</p>
+        </div>
+      </div>
     </form>
   )
 }

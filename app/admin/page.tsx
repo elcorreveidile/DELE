@@ -1,9 +1,10 @@
+import type { LucideIcon } from "lucide-react"
 import { requireServerRole } from "@/lib/auth-helpers"
 import { prisma } from "@/lib/prisma"
 import { Users, BookOpen, GraduationCap, DollarSign } from "lucide-react"
 
 export default async function AdminPage() {
-  const user = await requireServerRole(["ADMIN", "TEACHER"])
+  await requireServerRole(["ADMIN", "TEACHER"])
 
   // Obtener estadísticas
   const [
@@ -66,7 +67,7 @@ function AdminStatCard({
   value,
   color,
 }: {
-  icon: any
+  icon: LucideIcon
   label: string
   value: number
   color: "blue" | "purple" | "green" | "yellow"

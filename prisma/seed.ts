@@ -355,7 +355,7 @@ Tu actitud es clave para el éxito...`,
   // 7. CREAR SESIÓN DE CHAT DE EJEMPLO
   console.log('💬 Creando sesión de chat...')
 
-  const chatSession = await prisma.chatSessionPersonal.create({
+  await prisma.chatSessionPersonal.create({
     data: {
       userId: student.id,
       title: 'Ayuda con tiempos verbales',

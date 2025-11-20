@@ -3,19 +3,25 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { signOut } from "next-auth/react"
-import { 
-  LayoutDashboard, 
-  BookOpen, 
-  MessageSquare, 
-  User, 
-  Settings,
+import {
+  LayoutDashboard,
+  BookOpen,
+  MessageSquare,
+  User,
   LogOut,
-  Shield
+  Shield,
 } from "lucide-react"
 import type { User as SessionUser } from "next-auth"
 
 interface DashboardNavProps {
   user: SessionUser
+}
+
+function getInitials(name?: string | null) {
+  if (!name) return "DE"
+  const parts = name.split(" ").filter(Boolean)
+  const initials = parts.slice(0, 2).map((p) => p[0]).join("")
+  return initials.toUpperCase()
 }
 
 export function DashboardNav({ user }: DashboardNavProps) {
@@ -69,6 +75,20 @@ export function DashboardNav({ user }: DashboardNavProps) {
         <div className="hidden sm:block text-right">
           <p className="text-sm font-medium text-gray-900">{user.name}</p>
           <p className="text-xs text-gray-500">{user.role}</p>
+        </div>
+        <div className="h-9 w-9 overflow-hidden rounded-full border border-gray-200 bg-gray-100">
+          {user.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={user.image}
+              alt={user.name ?? "Avatar"}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-gray-600">
+              {getInitials(user.name)}
+            </div>
+          )}
         </div>
 
         <button

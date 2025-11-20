@@ -4,13 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { signOut } from "next-auth/react"
 import { LayoutDashboard, BookOpen, Users, CreditCard, LogOut } from "lucide-react"
-import type { User as SessionUser } from "next-auth"
-
-interface AdminNavProps {
-  user: SessionUser
-}
-
-export function AdminNav({ user }: AdminNavProps) {
+export function AdminNav() {
   const pathname = usePathname()
 
   const navigation = [

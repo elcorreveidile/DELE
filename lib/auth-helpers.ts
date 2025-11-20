@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation"
-import { getServerSession } from "./auth"
+import { auth } from "./auth"
 import type { Role } from "@prisma/client"
 
 export async function getServerUser() {
-  const session = await getServerSession()
+  const session = await auth()
   return session?.user
 }
 

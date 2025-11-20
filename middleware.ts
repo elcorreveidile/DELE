@@ -1,26 +1,24 @@
-import { withAuth } from "next-auth/middleware"
 import { NextResponse } from "next/server"
+import { auth } from "@/lib/auth"
 
-export default withAuth(
-  function middleware(req) {
-    const token = req.nextauth.token
-    const pathname = req.nextUrl.pathname
+export default auth((req) => {
+  const user = req.auth?.user
+  const pathname = req.nextUrl.pathname
 
-    // Verificar acceso al admin (solo ADMIN y TEACHER)
-    if (pathname.startsWith("/admin")) {
-      if (token?.role !== "ADMIN" && token?.role !== "TEACHER") {
-        return NextResponse.redirect(new URL("/dashboard", req.url))
-      }
-    }
-
-    return NextResponse.next()
-  },
-  {
-    callbacks: {
-      authorized: ({ token }) => !!token,
-    },
+  // Sin sesión, redirigir a login (se aplica solo en rutas del matcher)
+  if (!user) {
+    return NextResponse.redirect(new URL("/login", req.url))
   }
-)
+
+  // Verificar acceso al admin (solo ADMIN y TEACHER)
+  if (pathname.startsWith("/admin")) {
+    if (user.role !== "ADMIN" && user.role !== "TEACHER") {
+      return NextResponse.redirect(new URL("/dashboard", req.url))
+    }
+  }
+
+  return NextResponse.next()
+})
 
 // Rutas que requieren autenticación
 export const config = {

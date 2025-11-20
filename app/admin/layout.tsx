@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation"
 import { requireServerRole } from "@/lib/auth-helpers"
 import { AdminNav } from "@/components/admin/admin-nav"
 
@@ -22,7 +21,7 @@ export default async function AdminLayout({
                 {user.role}
               </span>
             </div>
-            <AdminNav user={user} />
+            <AdminNav />
           </div>
         </div>
       </header>
