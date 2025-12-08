@@ -1,0 +1,11 @@
+{
+  "name": "dele-platform",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test": "echo \"No automated tests yet — initialize the Next.js app to add real suites.\""
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
