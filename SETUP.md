@@ -113,6 +113,8 @@ NODE_ENV="development"
 
 ### 5. Generar Cliente de Prisma
 
+**NOTA**: Si tienes problemas descargando los binarios de Prisma (403 Forbidden), usa el método alternativo con SQL directo (ver más abajo).
+
 ```bash
 npm run db:generate
 ```
@@ -121,22 +123,41 @@ Este comando genera el cliente TypeScript de Prisma basado en tu schema.
 
 ### 6. Crear Tablas en la Base de Datos
 
+#### Método Principal (con Prisma)
+
 ```bash
 npm run db:push
 ```
 
-Este comando:
-- Crea todas las tablas según el schema
-- Sincroniza la estructura sin crear archivos de migración
-- Perfecto para desarrollo rápido
+#### Método Alternativo (SQL directo - si Prisma falla)
+
+Si tienes restricciones de red que impiden descargar los binarios de Prisma, usa el script SQL manual:
+
+```bash
+PGPASSWORD=dele_password psql -U dele_user -h localhost -d dele_c2 -f prisma/manual_migration.sql
+```
+
+Este script:
+- Crea todos los tipos ENUM (17 enums)
+- Crea todas las tablas (21 tablas)
+- Añade índices y restricciones
+- Es equivalente a `prisma db push`
 
 ### 7. Poblar con Datos Iniciales
+
+#### Método Principal (con Prisma)
 
 ```bash
 npm run db:seed
 ```
 
-Esto creará:
+#### Método Alternativo (SQL directo - si Prisma falla)
+
+```bash
+PGPASSWORD=dele_password psql -U dele_user -h localhost -d dele_c2 -f prisma/seed.sql
+```
+
+Ambos métodos crearán:
 - 1 nivel (C2)
 - 1 curso ("Preparación DELE C2")
 - 9 módulos completos
@@ -225,18 +246,24 @@ ALTER USER tuusuario CREATEDB;
 
 ### Error con binarios de Prisma
 
-Si tienes problemas descargando binarios de Prisma:
+Si tienes problemas descargando binarios de Prisma (403 Forbidden o errores de red):
 
 ```bash
-# Limpiar caché
-npx prisma generate --no-engine
+# Opción 1: Usar scripts SQL directos (recomendado)
+PGPASSWORD=dele_password psql -U dele_user -h localhost -d dele_c2 -f prisma/manual_migration.sql
+PGPASSWORD=dele_password psql -U dele_user -h localhost -d dele_c2 -f prisma/seed.sql
 
-# O reinstalar Prisma
+# Opción 2: Intentar con variables de entorno
+PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1 npm run db:generate
+
+# Opción 3: Limpiar caché y reinstalar
 npm uninstall prisma @prisma/client
 npm install -D prisma
 npm install @prisma/client
 npm run db:generate
 ```
+
+**Nota**: Los scripts SQL en `prisma/manual_migration.sql` y `prisma/seed.sql` son equivalentes completos a los comandos de Prisma y funcionan sin necesidad de descargar binarios.
 
 ## 📝 Scripts Útiles
 
