@@ -1,0 +1,780 @@
+// schema.prisma - DELE C2 Platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// USUARIOS Y AUTENTICACIÓN
+// ============================================================================
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?   // Hashed password for email/password auth
+  role          UserRole  @default(STUDENT)
+  locale        String    @default("es")
+
+  // Perfil de aprendizaje
+  levelEstimated String?  // A1, A2, B1, B2, C1, C2
+  levelGoal      String?  // Nivel objetivo
+  weeklyHours    Int?     // Horas semanales disponibles
+  examDate       DateTime? // Fecha del examen oficial
+
+  // Relaciones
+  profile         Profile?
+  accounts        Account[]
+  sessions        Session[]
+  learningPaths   LearningPath[]
+  attempts        Attempt[]
+  progress        Progress[]
+  subscriptions   Subscription[]
+  oralRecordings  OralRecording[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+}
+
+model Profile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Auto-evaluación por destreza (1-5)
+  comprehensionLectura  Int? // Comprensión de lectura
+  comprehensionAuditiva Int? // Comprensión auditiva
+  expresionEscrita      Int? // Expresión escrita
+  expresionOral         Int? // Expresión oral
+  interaccionOral       Int? // Interacción oral
+  mediacionEscrita      Int? // Mediación escrita
+  mediacionOral         Int? // Mediación oral
+
+  // Experiencia previa
+  hasStudiedSpanish     Boolean @default(false)
+  yearsStudying         Int?
+  hasLivedInSpain       Boolean @default(false)
+  monthsInSpain         Int?
+  previousDELELevel     String? // Último nivel DELE obtenido
+  previousDELEDate      DateTime?
+
+  // Preferencias de aprendizaje
+  preferredStudyTime    String? // morning, afternoon, evening, night
+  learningStyleVisual   Boolean @default(true)
+  learningStyleAuditory Boolean @default(true)
+  learningStyleKinesthetic Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum UserRole {
+  STUDENT
+  TEACHER
+  ADMIN
+}
+
+// Auth.js models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?  @db.Text
+  access_token      String?  @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?  @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================================================
+// ESTRUCTURA DE NIVELES Y CURSOS
+// ============================================================================
+
+model Level {
+  id          String   @id @default(cuid())
+  code        String   @unique // A1, A2, B1, B2, C1, C2
+  name        String   // "Nivel C2 - Maestría"
+  description String   @db.Text
+  order       Int      @unique
+
+  courses     Course[]
+  examModels  ExamModel[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Course {
+  id          String @id @default(cuid())
+  levelId     String
+  level       Level  @relation(fields: [levelId], references: [id])
+
+  title                String
+  description          String @db.Text
+  hoursRecommendedMin  Int // 160 para C2
+  hoursRecommendedMax  Int // 200 para C2
+
+  // Freemium: una unidad gratuita por nivel
+  isFreemiumUnitId     String? // ID del módulo freemium
+
+  // Relaciones
+  modules        Module[]
+  learningPaths  LearningPath[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([levelId])
+  @@index([levelId])
+}
+
+// ============================================================================
+// MÓDULOS Y LECCIONES
+// ============================================================================
+
+model Module {
+  id          String   @id @default(cuid())
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  order       Int      // 1-9 para C2
+  title       String
+  description String   @db.Text
+
+  // Objetivos y metadata
+  objectives           String[] // Array de objetivos
+  skills               Skill[]  // CL, CA, EE, EO, IE, IO, ME, MO
+  deleTaskTypes        C2TaskType[] // Tipos de tareas DELE
+
+  // Duración estimada
+  hoursMin    Int
+  hoursMax    Int
+
+  // Freemium
+  isFreemium  Boolean  @default(false)
+
+  // Relaciones
+  lessons          Lesson[]
+  tasks            Task[]
+  learningPathItems LearningPathItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([courseId, order])
+  @@index([courseId])
+}
+
+model Lesson {
+  id          String @id @default(cuid())
+  moduleId    String
+  module      Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  order       Int
+  title       String
+
+  // Contenido
+  description      String @db.Text
+  objectives       String[]
+
+  // Recursos (JSON)
+  resources        Json[] // [{type, url, title}]
+
+  // Duración
+  estimatedMinutes Int
+
+  // Relaciones
+  tasks       Task[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([moduleId, order])
+  @@index([moduleId])
+}
+
+// ============================================================================
+// TAREAS
+// ============================================================================
+
+model Task {
+  id          String     @id @default(cuid())
+  moduleId    String
+  module      Module     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  lessonId    String?
+  lesson      Lesson?    @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+
+  // Tipo de tarea
+  taskType    C2TaskType
+  skill       Skill
+
+  // Prueba y peso
+  prueba      Prueba
+  weight      Float?
+
+  // Contenido
+  title          String
+  instructions   String   @db.Text
+  description    String?  @db.Text
+
+  // Recursos (JSON)
+  resourceRefs   Json[]
+
+  // Parámetros
+  domain         String?
+  textGenre      String?
+  wordCountMin   Int?
+  wordCountMax   Int?
+  durationMinutes Int?
+  preparationMinutes Int?
+
+  // Para mediación
+  requiresMultipleSources Boolean @default(false)
+  sourceCount            Int?
+  mediationMode          MediationMode?
+
+  // Metadatos
+  difficulty     Difficulty @default(C2)
+  isOfficial     Boolean    @default(false)
+  isSimulacro    Boolean    @default(false)
+
+  // Relaciones
+  attempts       Attempt[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([taskType])
+  @@index([prueba])
+  @@index([moduleId])
+}
+
+enum C2TaskType {
+  P1_T1  // Léxico con distinciones sutiles
+  P1_T2  // Estructuras complejas
+  P1_T3  // Cohesión y coherencia
+  P1_T4  // Comprensión auditiva con matices
+  P1_T5  // Ideas implícitas
+  P1_T6  // Actitudes y opiniones
+  P1_T7  // Textos complejos
+  P2_T1  // Mediación escrita multimodal
+  P2_T2  // Expresión escrita formal
+  P2_T3  // Expresión escrita formal
+  P3_T1  // Mediación oral
+  P3_T2  // Interacción formal
+  P3_T3  // Negociación
+}
+
+enum Prueba {
+  PRUEBA_1
+  PRUEBA_2
+  PRUEBA_3
+}
+
+enum Skill {
+  CL  // Comprensión de lectura
+  CA  // Comprensión auditiva
+  EE  // Expresión escrita
+  EO  // Expresión oral
+  IE  // Interacción escrita
+  IO  // Interacción oral
+  ME  // Mediación escrita
+  MO  // Mediación oral
+}
+
+enum MediationMode {
+  ORAL
+  ESCRITA
+  MULTIMODAL
+}
+
+enum Difficulty {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+}
+
+// ============================================================================
+// MODELOS DE EXAMEN
+// ============================================================================
+
+model ExamModel {
+  id       String @id @default(cuid())
+  levelId  String
+  level    Level  @relation(fields: [levelId], references: [id])
+
+  name        String
+  year        Int
+  convocatoria String
+
+  pdfPath     String
+
+  section     Prueba
+  taskType    C2TaskType?
+  duration    Int
+  weight      Float
+
+  attempts    Attempt[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([levelId])
+  @@index([section])
+}
+
+// ============================================================================
+// RUTAS DE APRENDIZAJE
+// ============================================================================
+
+model LearningPath {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id])
+
+  routeType RouteType @default(STANDARD)
+
+  startDate  DateTime
+  targetDate DateTime?
+
+  status     PathStatus @default(ACTIVE)
+
+  items      LearningPathItem[]
+  checkpoints Checkpoint[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, courseId])
+  @@index([userId])
+}
+
+model LearningPathItem {
+  id             String       @id @default(cuid())
+  learningPathId String
+  learningPath   LearningPath @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+
+  moduleId       String
+  module         Module       @relation(fields: [moduleId], references: [id])
+
+  week           Int
+  session        Int
+  scheduledDate  DateTime?
+
+  status         ItemStatus   @default(PENDING)
+  startedAt      DateTime?
+  completedAt    DateTime?
+
+  timeSpentMinutes Int        @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([learningPathId, moduleId])
+  @@index([learningPathId, status])
+}
+
+enum RouteType {
+  STANDARD
+  INTENSIVE
+  LONG_TERM
+  CUSTOM
+}
+
+enum PathStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ABANDONED
+}
+
+enum ItemStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+// ============================================================================
+// CHECKPOINTS
+// ============================================================================
+
+model Checkpoint {
+  id             String       @id @default(cuid())
+  learningPathId String
+  learningPath   LearningPath @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+
+  type           CheckpointType
+  week           Int
+  scheduledDate  DateTime
+  completedAt    DateTime?
+
+  prueba1Score   Float?
+  prueba2Score   Float?
+  prueba3Score   Float?
+  totalScore     Float?
+  passed         Boolean?
+
+  feedback       String?      @db.Text
+  weaknesses     String[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([learningPathId])
+}
+
+enum CheckpointType {
+  PARTIAL_SIMULACRO
+  FULL_SIMULACRO
+  SELF_ASSESSMENT
+  REVIEW
+}
+
+// ============================================================================
+// INTENTOS Y EVALUACIONES
+// ============================================================================
+
+model Attempt {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  taskId      String?
+  task        Task?      @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  examModelId String?
+  examModel   ExamModel? @relation(fields: [examModelId], references: [id], onDelete: SetNull)
+
+  submissionText  String?  @db.Text
+  submissionFiles Json[]
+
+  autoScore       Float?
+  correctAnswers  Int?
+  totalQuestions  Int?
+
+  evaluation      Evaluation?
+
+  durationSeconds Int
+  completedAt     DateTime @default(now())
+
+  aiFeedback      String?  @db.Text
+  aiAnalysis      Json?
+
+  humanFeedback   String?  @db.Text
+  evaluatorId     String?
+
+  oralRecording   OralRecording?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([taskId])
+  @@index([completedAt])
+}
+
+// ============================================================================
+// EVALUACIÓN POR BANDAS
+// ============================================================================
+
+model Evaluation {
+  id         String   @id @default(cuid())
+  attemptId  String   @unique
+  attempt    Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  prueba     Prueba
+  taskType   C2TaskType
+
+  // Criterios (Bandas 0-3)
+  cohesionBand    Band
+  cohesionComment String?  @db.Text
+
+  correccionBand    Band
+  correccionComment String?  @db.Text
+
+  alcanceBand    Band
+  alcanceComment String?  @db.Text
+
+  cumplimientoBand    Band
+  cumplimientoComment String?  @db.Text
+
+  // Escala holística (solo P3)
+  holisticBand    Band?
+  holisticComment String?  @db.Text
+
+  // Puntuaciones
+  criteriaScore   Float
+  holisticScore   Float?
+  finalScore      Float
+
+  weightsUsed     Json
+
+  // Metadata
+  evaluatedBy     EvaluationType
+  evaluatorId     String?
+  evaluatedAt     DateTime @default(now())
+
+  // Feedback
+  generalFeedback String?  @db.Text
+  strengths       String[]
+  weaknesses      String[]
+  recommendations String[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([prueba])
+  @@index([evaluatedAt])
+}
+
+enum Band {
+  BAND_0
+  BAND_1
+  BAND_2
+  BAND_3
+}
+
+enum EvaluationType {
+  AI
+  HUMAN
+  HYBRID
+}
+
+// ============================================================================
+// GRABACIONES ORALES
+// ============================================================================
+
+model OralRecording {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attemptId  String   @unique
+  attempt    Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  audioUrl       String
+  audioFormat    String
+  durationSeconds Int
+  fileSize       Int
+
+  taskType       C2TaskType
+  recordedAt     DateTime   @default(now())
+
+  transcription  String?    @db.Text
+  transcribedBy  String?
+
+  evaluationStatus EvaluationStatus @default(PENDING)
+  evaluatedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([evaluationStatus])
+}
+
+enum EvaluationStatus {
+  PENDING
+  IN_REVIEW
+  COMPLETED
+}
+
+// ============================================================================
+// PROGRESO
+// ============================================================================
+
+model Progress {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  skill     Skill
+  levelId   String
+
+  completion       Float   @default(0)
+  averageScore     Float?
+  attemptsCount    Int     @default(0)
+  timeSpentMinutes Int     @default(0)
+
+  avgCohesionBand    Float?
+  avgCorreccionBand  Float?
+  avgAlcanceBand     Float?
+  avgCumplimientoBand Float?
+
+  strengths   String[]
+  weaknesses  String[]
+
+  lastUpdated DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, skill, levelId])
+  @@index([userId])
+}
+
+// ============================================================================
+// PAGOS
+// ============================================================================
+
+model PaymentPlan {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @db.Text
+
+  price       Int
+  currency    String   @default("EUR")
+  interval    Interval
+
+  accessScope String[]
+  features    String[]
+
+  stripePriceId String @unique
+
+  isActive    Boolean  @default(true)
+
+  subscriptions Subscription[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Interval {
+  MONTHLY
+  YEARLY
+  ONE_TIME
+}
+
+model Subscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId    String
+  plan      PaymentPlan @relation(fields: [planId], references: [id])
+
+  status    SubscriptionStatus
+
+  stripeSubscriptionId String  @unique
+  stripeCustomerId     String
+
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAt           DateTime?
+  canceledAt         DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  TRIALING
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  UNPAID
+}
+
+// ============================================================================
+// CONTENIDO
+// ============================================================================
+
+model ContentPiece {
+  id          String   @id @default(cuid())
+  contentId   String   @unique
+  type        ContentType
+  title       String
+
+  category    String
+  subcategory String?
+  genre       String
+  domain      String
+  level       Difficulty @default(C2)
+
+  wordCount       Int?
+  durationSeconds Int?
+  spanishVariety  String
+  keywords        String[]
+  lexicalC2Terms  String[]
+  grammarFeatures String[]
+
+  deleTaskTypes   C2TaskType[]
+  usedInModules   String[]
+
+  filePath      String
+  fileUrl       String?
+  thumbnailUrl  String?
+
+  createdBy     String
+  reviewedBy    String?
+  status        ContentStatus @default(DRAFT)
+  qualityScore  Float?
+
+  usageCount    Int         @default(0)
+  lastUsed      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type, status])
+  @@index([level, category])
+}
+
+enum ContentType {
+  TEXT
+  AUDIO
+  GRAPHIC
+  VIDEO
+  SCENARIO
+  INSTRUCTION
+}
+
+enum ContentStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+}
